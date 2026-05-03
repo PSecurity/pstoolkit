@@ -203,67 +203,244 @@ menu_tunelamento() {
   done
 }
 
-# =====================================
-# ====== MÓDULO 2: RECONHECIMENTO ======
-# =====================================
+# ============================================================
+# ====== MÓDULO 2: PS.NMAP - PeekSecurity ======
+# Script educativo de reconhecimento com Nmap
+# ============================================================
 
-# ------ INSTALAR NMAP ------
-instalar_nmap() {
-  if command -v nmap >/dev/null 2>&1; then
-    echo -e "${verde}✔ Nmap já instalado!${reset}"
-    nmap --version | head -1
-    return
+# ------ VERIFICAR / INSTALAR NMAP ------
+verificar_nmap() {
+  if ! command -v nmap &> /dev/null; then
+    echo -e "${vermelho}[!] Nmap não encontrado!${reset}"
+    echo -e "${amarelo}[*] Instalando nmap...${reset}"
+    if [[ "$ambiente" == "termux" ]]; then
+      pkg update -y && pkg install nmap -y
+    else
+      sudo apt update && sudo apt install nmap -y
+    fi
+    echo -e "${verde}[✓] Nmap instalado com sucesso!${reset}"
+    sleep 1
   fi
-  loading
-  [[ "$ambiente" == "termux" ]] && pkg install nmap -y || sudo apt install nmap -y
-  command -v nmap >/dev/null 2>&1 \
-    && echo -e "${verde}✔ Nmap instalado!${reset}" \
-    || echo -e "${vermelho}[!] Erro ao instalar nmap${reset}"
 }
 
-# ------ SCAN RÁPIDO ------
-scan_rapido() {
-  echo -ne "${ciano}[?] Alvo (IP ou domínio): ${reset}"
-  read alvo
-  [[ -z "$alvo" ]] && echo -e "${vermelho}[!] Alvo vazio!${reset}" && return
-  echo -e "\n${amarelo}[CMD] nmap -sV --open $alvo${reset}\n"
-  nmap -sV --open "$alvo"
-}
-
-# ------ SCAN DE REDE LOCAL ------
-scan_rede_local() {
-  local gateway=$(ip route | grep default | awk '{print $3}' 2>/dev/null)
-  local rede=$(echo "$gateway" | cut -d'.' -f1-3).0/24
-  echo -e "${amarelo}[*] Rede detectada: ${verde}$rede${reset}"
-  echo -e "${amarelo}[CMD] nmap -sn $rede${reset}\n"
-  nmap -sn "$rede"
-}
-
-# ------ WHOIS ------
-info_whois() {
-  if ! command -v whois >/dev/null 2>&1; then
-    echo -e "${amarelo}[*] Instalando whois...${reset}"
-    [[ "$ambiente" == "termux" ]] && pkg install whois -y || sudo apt install whois -y
+# ------ SOLICITA O ALVO ------
+pedir_alvo() {
+  echo -e "${ciano}[?] Digite o IP ou domínio alvo:${reset}"
+  echo -e "${amarelo}    Exemplo: 192.168.1.1 ou exemplo.com${reset}"
+  echo -ne "  ${branco}Alvo: ${reset}"
+  read ALVO
+  if [[ -z "$ALVO" ]]; then
+    echo -e "${vermelho}[!] Alvo não pode ser vazio!${reset}"
+    sleep 1
+    return 1
   fi
-  echo -ne "${ciano}[?] Domínio ou IP para whois: ${reset}"
-  read alvo
-  [[ -z "$alvo" ]] && echo -e "${vermelho}[!] Alvo vazio!${reset}" && return
-  echo -e "\n${amarelo}[CMD] whois $alvo${reset}\n"
-  whois "$alvo"
+  return 0
 }
 
-# ------ MENU RECONHECIMENTO ------
+# ------ FUNÇÃO 1 - PING SCAN ------
+# Verifica quais hosts estão ativos na rede
+# Não escaneia portas, só descobre dispositivos vivos
+scan_ping() {
+  banner
+  echo -e "${azul}╔══════════════════════════════════════╗"
+  echo -e "║        🔍 SCAN DE PING (HOST)        ║"
+  echo -e "╚══════════════════════════════════════╝${reset}"
+  echo ""
+  echo -e "${branco}📖 O que faz:${reset}"
+  echo -e "   Descobre quais dispositivos estão ONLINE"
+  echo -e "   na rede, sem escanear portas."
+  echo -e "   Útil para mapear hosts ativos rapidamente.\n"
+  pedir_alvo || return
+  echo -e "\n${amarelo}[*] Executando Ping Scan em: ${ALVO}${reset}"
+  echo -e "${ciano}[CMD] nmap -sn ${ALVO}${reset}\n"
+  nmap -sn "$ALVO"
+  rodape_nmap
+}
+
+# ------ FUNÇÃO 2 - SCAN DE PORTAS COMUNS ------
+# Escaneia as 1000 portas mais usadas
+scan_portas_comuns() {
+  banner
+  echo -e "${azul}╔══════════════════════════════════════╗"
+  echo -e "║      🚪 SCAN DE PORTAS COMUNS        ║"
+  echo -e "╚══════════════════════════════════════╝${reset}"
+  echo ""
+  echo -e "${branco}📖 O que faz:${reset}"
+  echo -e "   Escaneia as 1000 portas mais comuns (padrão nmap)."
+  echo -e "   Identifica serviços como HTTP, SSH, FTP, etc."
+  echo -e "   Boa escolha para um primeiro reconhecimento.\n"
+  pedir_alvo || return
+  echo -e "\n${amarelo}[*] Escaneando portas comuns em: ${ALVO}${reset}"
+  echo -e "${ciano}[CMD] nmap ${ALVO}${reset}\n"
+  nmap "$ALVO"
+  rodape_nmap
+}
+
+# ------ FUNÇÃO 3 - SCAN COMPLETO DE PORTAS ------
+# Varre todas as 65535 portas do alvo
+scan_portas_completo() {
+  banner
+  echo -e "${azul}╔══════════════════════════════════════╗"
+  echo -e "║     🔓 SCAN COMPLETO DE PORTAS       ║"
+  echo -e "╚══════════════════════════════════════╝${reset}"
+  echo ""
+  echo -e "${branco}📖 O que faz:${reset}"
+  echo -e "   Varre TODAS as 65535 portas do alvo."
+  echo -e "   Encontra serviços em portas não convencionais."
+  echo -e "   ⏳ Mais lento — tenha paciência!\n"
+  pedir_alvo || return
+  echo -e "\n${amarelo}[*] Escaneando todas as portas em: ${ALVO}${reset}"
+  echo -e "${ciano}[CMD] nmap -p- ${ALVO}${reset}\n"
+  nmap -p- "$ALVO"
+  rodape_nmap
+}
+
+# ------ FUNÇÃO 4 - DETECÇÃO DE VERSÕES ------
+# Identifica qual software está rodando em cada porta
+scan_versoes() {
+  banner
+  echo -e "${azul}╔══════════════════════════════════════╗"
+  echo -e "║     🧠 DETECÇÃO DE VERSÕES           ║"
+  echo -e "╚══════════════════════════════════════╝${reset}"
+  echo ""
+  echo -e "${branco}📖 O que faz:${reset}"
+  echo -e "   Identifica QUAL software está rodando em cada porta."
+  echo -e "   Exemplo: Apache 2.4.41, OpenSSH 8.2, MySQL 5.7"
+  echo -e "   Essencial para identificar versões vulneráveis.\n"
+  pedir_alvo || return
+  echo -e "\n${amarelo}[*] Detectando versões em: ${ALVO}${reset}"
+  echo -e "${ciano}[CMD] nmap -sV ${ALVO}${reset}\n"
+  nmap -sV "$ALVO"
+  rodape_nmap
+}
+
+# ------ FUNÇÃO 5 - DETECÇÃO DE SO ------
+# Tenta identificar o SO do alvo
+scan_os() {
+  banner
+  echo -e "${azul}╔══════════════════════════════════════╗"
+  echo -e "║     💻 DETECÇÃO DE SO (OS)           ║"
+  echo -e "╚══════════════════════════════════════╝${reset}"
+  echo ""
+  echo -e "${branco}📖 O que faz:${reset}"
+  echo -e "   Tenta identificar o Sistema Operacional do alvo."
+  echo -e "   Exemplo: Linux 5.x, Windows 10, Android."
+  echo -e "   ⚠️  Pode precisar de permissão root para funcionar.\n"
+  pedir_alvo || return
+  echo -e "\n${amarelo}[*] Detectando SO em: ${ALVO}${reset}"
+  echo -e "${ciano}[CMD] nmap -O ${ALVO}${reset}\n"
+  nmap -O "$ALVO"
+  rodape_nmap
+}
+
+# ------ FUNÇÃO 6 - SCAN AGRESSIVO ------
+# Combina: versões + OS + scripts + traceroute
+scan_agressivo() {
+  banner
+  echo -e "${azul}╔══════════════════════════════════════╗"
+  echo -e "║       💥 SCAN AGRESSIVO (FULL)       ║"
+  echo -e "╚══════════════════════════════════════╝${reset}"
+  echo ""
+  echo -e "${branco}📖 O que faz:${reset}"
+  echo -e "   Combina: versões + OS + scripts NSE + traceroute."
+  echo -e "   É o scan mais COMPLETO disponível no nmap."
+  echo -e "   ⚠️  Gera muito tráfego — pode ser detectado!\n"
+  pedir_alvo || return
+  echo -e "\n${amarelo}[*] Executando scan agressivo em: ${ALVO}${reset}"
+  echo -e "${ciano}[CMD] nmap -A ${ALVO}${reset}\n"
+  nmap -A "$ALVO"
+  rodape_nmap
+}
+
+# ------ FUNÇÃO 7 - SCAN SILENCIOSO (SYN) ------
+# Scan mais discreto, não completa o handshake TCP
+scan_silencioso() {
+  banner
+  echo -e "${azul}╔══════════════════════════════════════╗"
+  echo -e "║       🥷 SCAN SILENCIOSO (SYN)       ║"
+  echo -e "╚══════════════════════════════════════╝${reset}"
+  echo ""
+  echo -e "${branco}📖 O que faz:${reset}"
+  echo -e "   Usa SYN Scan — não completa o handshake TCP."
+  echo -e "   Mais discreto e rápido que o scan padrão."
+  echo -e "   ⚠️  Requer permissão root (sudo/tsu).\n"
+  pedir_alvo || return
+  echo -e "\n${amarelo}[*] Executando SYN Scan em: ${ALVO}${reset}"
+  echo -e "${ciano}[CMD] nmap -sS ${ALVO}${reset}\n"
+  nmap -sS "$ALVO"
+  rodape_nmap
+}
+
+# ------ FUNÇÃO 8 - SCAN DE VULNERABILIDADES (NSE) ------
+# Usa scripts do Nmap para detectar vulns conhecidas
+scan_vulns() {
+  banner
+  echo -e "${azul}╔══════════════════════════════════════╗"
+  echo -e "║    🛡️  SCAN DE VULNERABILIDADES      ║"
+  echo -e "╚══════════════════════════════════════╝${reset}"
+  echo ""
+  echo -e "${branco}📖 O que faz:${reset}"
+  echo -e "   Usa os scripts NSE (Nmap Scripting Engine)"
+  echo -e "   para detectar vulnerabilidades conhecidas."
+  echo -e "   Identifica CVEs, configurações fracas, etc.\n"
+  pedir_alvo || return
+  echo -e "\n${amarelo}[*] Buscando vulnerabilidades em: ${ALVO}${reset}"
+  echo -e "${ciano}[CMD] nmap --script vuln ${ALVO}${reset}\n"
+  nmap --script vuln "$ALVO"
+  rodape_nmap
+}
+
+# ------ FUNÇÃO 9 - SCAN PERSONALIZADO ------
+# O usuário digita os próprios parâmetros do nmap
+scan_custom() {
+  banner
+  echo -e "${azul}╔══════════════════════════════════════╗"
+  echo -e "║      ⚙️  SCAN PERSONALIZADO           ║"
+  echo -e "╚══════════════════════════════════════╝${reset}"
+  echo ""
+  echo -e "${branco}📖 O que faz:${reset}"
+  echo -e "   Você escolhe os parâmetros do nmap manualmente."
+  echo -e "   Ideal para quem já tem experiência com a ferramenta.\n"
+  echo -e "${amarelo}   Exemplos de parâmetros:${reset}"
+  echo -e "   -p 80,443       → portas específicas"
+  echo -e "   -sU             → scan UDP"
+  echo -e "   --script http-* → scripts HTTP\n"
+  pedir_alvo || return
+  echo -ne "${ciano}[?] Parâmetros nmap: ${reset}"
+  read PARAMS
+  echo -e "\n${amarelo}[*] Executando scan personalizado em: ${ALVO}${reset}"
+  echo -e "${ciano}[CMD] nmap ${PARAMS} ${ALVO}${reset}\n"
+  nmap $PARAMS "$ALVO"
+  rodape_nmap
+}
+
+# ------ RODAPÉ DO PS.NMAP ------
+rodape_nmap() {
+  echo ""
+  echo -e "${verde}[✓] Scan finalizado!${reset}"
+  echo -e "${ciano}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${reset}"
+  echo -ne "${branco}[?] Pressione ENTER para voltar ao menu...${reset}"
+  read
+}
+
+# ------ MENU PS.NMAP ------
 menu_reconhecimento() {
+  verificar_nmap
   while true; do
     banner
     echo -e "${azul}╔══════════════════════════════════════╗"
-    echo -e "║     🔍 MÓDULO: RECONHECIMENTO        ║"
+    echo -e "║     🔍 MÓDULO: PS.NMAP               ║"
     echo -e "╚══════════════════════════════════════╝${reset}"
     echo ""
-    echo -e "  ${verde}[1]${reset} 📦 Instalar Nmap"
-    echo -e "  ${verde}[2]${reset} ⚡ Scan Rápido (portas + versões)"
-    echo -e "  ${verde}[3]${reset} 🏠 Scan Rede Local"
-    echo -e "  ${verde}[4]${reset} 🌐 Whois (info de domínio/IP)"
+    echo -e "  ${verde}[1]${reset} 🔍 Ping Scan          ${amarelo}→ Hosts ativos na rede${reset}"
+    echo -e "  ${verde}[2]${reset} 🚪 Portas Comuns       ${amarelo}→ 1000 portas padrão${reset}"
+    echo -e "  ${verde}[3]${reset} 🔓 Portas Completo     ${amarelo}→ Todas as 65535 portas${reset}"
+    echo -e "  ${verde}[4]${reset} 🧠 Detecção de Versões ${amarelo}→ Software em cada porta${reset}"
+    echo -e "  ${verde}[5]${reset} 💻 Detecção de SO      ${amarelo}→ Sistema Operacional${reset}"
+    echo -e "  ${verde}[6]${reset} 💥 Scan Agressivo      ${amarelo}→ Tudo de uma vez${reset}"
+    echo -e "  ${verde}[7]${reset} 🥷 Scan Silencioso     ${amarelo}→ SYN Scan (discreto)${reset}"
+    echo -e "  ${verde}[8]${reset} 🛡️  Vulnerabilidades    ${amarelo}→ Scripts NSE vuln${reset}"
+    echo -e "  ${verde}[9]${reset} ⚙️  Scan Personalizado  ${amarelo}→ Seus próprios parâmetros${reset}"
     echo ""
     echo -e "  ${vermelho}[0]${reset} ↩️  Voltar ao menu principal"
     echo ""
@@ -271,10 +448,226 @@ menu_reconhecimento() {
     read op
 
     case $op in
-      1) instalar_nmap     ; rodape ;;
-      2) scan_rapido       ; rodape ;;
-      3) scan_rede_local   ; rodape ;;
-      4) info_whois        ; rodape ;;
+      1) scan_ping           ;;
+      2) scan_portas_comuns  ;;
+      3) scan_portas_completo ;;
+      4) scan_versoes        ;;
+      5) scan_os             ;;
+      6) scan_agressivo      ;;
+      7) scan_silencioso     ;;
+      8) scan_vulns          ;;
+      9) scan_custom         ;;
+      0) return ;;
+      *) echo -e "${vermelho}[!] Opção inválida!${reset}"; sleep 1 ;;
+    esac
+  done
+}
+
+# ============================================================
+# ====== MÓDULO 3: PS.SUDO - PeekSecurity ======
+# Wrapper sudo moderno para Termux (Magisk / KernelSU / APatch)
+# ============================================================
+
+# ------ LOCALIZA O SU DISPONÍVEL ------
+# Suporte: Magisk moderno, KernelSU, APatch, fallback PATH
+localizar_su() {
+  if command -v su >/dev/null 2>&1; then
+    SU="su"; return 0
+  fi
+  if [ -x /data/adb/ksu/bin/su ]; then
+    SU=/data/adb/ksu/bin/su; return 0
+  fi
+  if [ -x /data/adb/ap/bin/su ]; then
+    SU=/data/adb/ap/bin/su; return 0
+  fi
+  for path in /sbin/su /system/xbin/su /system/bin/su /su/bin/su /magisk/.core/bin/su; do
+    if [ -x "$path" ]; then SU="$path"; return 0; fi
+  done
+  return 1
+}
+
+# ------ SETUP DO ROOT HOME (sem remount, Android 10+) ------
+sudo_setup_root_home() {
+  local PRE=/data/data/com.termux/files
+  local ROOT_HOME=$PRE/home/.suroot
+  if [ ! -d "$ROOT_HOME" ]; then
+    $SU -c "mkdir -p $ROOT_HOME && chmod 700 $ROOT_HOME" 2>/dev/null
+    local bashrc="PS1='# '\nexport TERM=$TERM\nexport PATH=$PATH\nexport LD_LIBRARY_PATH=$PRE/usr/lib"
+    $SU -c "printf '$bashrc\n' > $ROOT_HOME/.bashrc && chmod 700 $ROOT_HOME/.bashrc" 2>/dev/null
+  fi
+  echo "$ROOT_HOME"
+}
+
+# ------ VERIFICAR ROOT ------
+sudo_check() {
+  banner
+  echo -e "${azul}╔══════════════════════════════════════╗"
+  echo -e "║      🔑 PS.SUDO — VERIFICAR ROOT     ║"
+  echo -e "╚══════════════════════════════════════╝${reset}"
+  echo ""
+  echo -e "${branco}📖 O que faz:${reset}"
+  echo -e "   Verifica se o root está disponível e funcional."
+  echo -e "   Detecta Magisk, KernelSU e APatch automaticamente.\n"
+
+  echo -e "${amarelo}[*] Procurando binário su...${reset}"
+
+  if ! localizar_su; then
+    echo -e "${vermelho}[✗] su não encontrado!${reset}"
+    echo -e "${amarelo}    Instale Magisk, KernelSU ou APatch no dispositivo.${reset}"
+    rodape; return
+  fi
+
+  echo -e "${verde}[✓] su encontrado: ${branco}$SU${reset}"
+  echo -e "${amarelo}[*] Testando acesso root real...${reset}"
+
+  local uid=$($SU -c "id -u" 2>/dev/null)
+  if [ "$uid" = "0" ]; then
+    echo -e "${verde}[✓] Root funcional! UID = 0${reset}"
+  else
+    echo -e "${vermelho}[✗] Root negado pelo gerenciador.${reset}"
+    echo -e "${amarelo}    Conceda permissão ao Termux no Magisk/KernelSU.${reset}"
+  fi
+  rodape
+}
+
+# ------ INFO DO AMBIENTE ROOT ------
+sudo_info() {
+  banner
+  echo -e "${azul}╔══════════════════════════════════════╗"
+  echo -e "║      🔑 PS.SUDO — INFO ROOT          ║"
+  echo -e "╚══════════════════════════════════════╝${reset}"
+  echo ""
+
+  if ! localizar_su; then
+    echo -e "${vermelho}[✗] su não encontrado!${reset}"
+    rodape; return
+  fi
+
+  local uid=$($SU -c "id -u" 2>/dev/null)
+  local whoami_root=$($SU -c "whoami" 2>/dev/null)
+  local kernel=$($SU -c "uname -r" 2>/dev/null)
+
+  echo -e "${ciano}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${reset}"
+  echo -e "  ${amarelo}su:${reset}        $SU"
+  echo -e "  ${amarelo}UID root:${reset}  ${uid:-N/A}"
+  echo -e "  ${amarelo}Whoami:${reset}    ${whoami_root:-N/A}"
+  echo -e "  ${amarelo}Kernel:${reset}    ${kernel:-N/A}"
+  echo -e "${ciano}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${reset}"
+  rodape
+}
+
+# ------ INSTALAR PS.SUDO NO PATH ------
+sudo_instalar() {
+  banner
+  echo -e "${azul}╔══════════════════════════════════════╗"
+  echo -e "║      🔑 PS.SUDO — INSTALAR           ║"
+  echo -e "╚══════════════════════════════════════╝${reset}"
+  echo ""
+  echo -e "${branco}📖 O que faz:${reset}"
+  echo -e "   Instala o PS.Sudo no PATH do Termux."
+  echo -e "   Após instalar, use 'sudo <comando>' normalmente.\n"
+
+  local DEST="$PREFIX/bin/sudo"
+
+  # Baixa do repositório
+  echo -e "${amarelo}[*] Baixando PS.Sudo...${reset}"
+  if wget -q -O "$DEST" "https://raw.githubusercontent.com/PSecurity/ps.sudo/master/sudo"; then
+    chmod +x "$DEST"
+    echo -e "${verde}[✓] PS.Sudo instalado em: ${branco}$DEST${reset}"
+    echo -e "${verde}[✓] Use: sudo --check para testar${reset}"
+  else
+    echo -e "${vermelho}[!] Erro no download. Verifique sua conexão.${reset}"
+  fi
+  rodape
+}
+
+# ------ SHELL ROOT INTERATIVO ------
+sudo_shell() {
+  banner
+  echo -e "${azul}╔══════════════════════════════════════╗"
+  echo -e "║      🔑 PS.SUDO — SHELL ROOT         ║"
+  echo -e "╚══════════════════════════════════════╝${reset}"
+  echo ""
+  echo -e "${branco}📖 O que faz:${reset}"
+  echo -e "   Abre um shell interativo como root."
+  echo -e "   Digite 'exit' para voltar ao Termux.\n"
+
+  if ! localizar_su; then
+    echo -e "${vermelho}[!] su não encontrado!${reset}"
+    rodape; return
+  fi
+
+  local PRE=/data/data/com.termux/files
+  local ROOT_HOME=$(sudo_setup_root_home)
+  local BINPRE=$PRE/usr/bin
+
+  echo -e "${amarelo}[*] Abrindo shell root...${reset}"
+  echo -e "${amarelo}    Digite 'exit' para voltar ao toolkit.${reset}\n"
+
+  $SU -c "export HOME=$ROOT_HOME; export PATH=$PATH; export LD_LIBRARY_PATH=$PRE/usr/lib; cd $PWD; exec $BINPRE/bash --rcfile $ROOT_HOME/.bashrc"
+
+  stty sane 2>/dev/null
+  rodape
+}
+
+# ------ EXECUTAR COMANDO COMO ROOT ------
+sudo_executar() {
+  banner
+  echo -e "${azul}╔══════════════════════════════════════╗"
+  echo -e "║      🔑 PS.SUDO — EXECUTAR CMD       ║"
+  echo -e "╚══════════════════════════════════════╝${reset}"
+  echo ""
+  echo -e "${branco}📖 O que faz:${reset}"
+  echo -e "   Executa um comando pontual como root.\n"
+  echo -e "${amarelo}   Exemplos:${reset}"
+  echo -e "   nmap -sS 192.168.1.1"
+  echo -e "   ls /data/data\n"
+
+  if ! localizar_su; then
+    echo -e "${vermelho}[!] su não encontrado!${reset}"
+    rodape; return
+  fi
+
+  echo -ne "${ciano}[?] Comando para executar como root: ${reset}"
+  read CMD
+
+  [[ -z "$CMD" ]] && echo -e "${vermelho}[!] Comando vazio!${reset}" && rodape && return
+
+  local PRE=/data/data/com.termux/files
+  local ROOT_HOME=$(sudo_setup_root_home)
+
+  echo -e "\n${amarelo}[CMD] sudo $CMD${reset}\n"
+  $SU -c "export HOME=$ROOT_HOME; export PATH=$PATH; export LD_LIBRARY_PATH=$PRE/usr/lib; cd $PWD; $CMD"
+
+  stty sane 2>/dev/null
+  rodape
+}
+
+# ------ MENU PS.SUDO ------
+menu_sudo() {
+  while true; do
+    banner
+    echo -e "${azul}╔══════════════════════════════════════╗"
+    echo -e "║      🔑 MÓDULO: PS.SUDO              ║"
+    echo -e "╚══════════════════════════════════════╝${reset}"
+    echo ""
+    echo -e "  ${verde}[1]${reset} ✅ Verificar Root      ${amarelo}→ Testa se root funciona${reset}"
+    echo -e "  ${verde}[2]${reset} 📋 Info Root           ${amarelo}→ Detalhes do ambiente${reset}"
+    echo -e "  ${verde}[3]${reset} 🐚 Shell Root          ${amarelo}→ Terminal interativo root${reset}"
+    echo -e "  ${verde}[4]${reset} ⚡ Executar Comando    ${amarelo}→ Roda comando como root${reset}"
+    echo -e "  ${verde}[5]${reset} 📦 Instalar PS.Sudo    ${amarelo}→ Instala no PATH do Termux${reset}"
+    echo ""
+    echo -e "  ${vermelho}[0]${reset} ↩️  Voltar ao menu principal"
+    echo ""
+    echo -ne "  ${branco}Opção: ${reset}"
+    read op
+
+    case $op in
+      1) sudo_check    ;;
+      2) sudo_info     ;;
+      3) sudo_shell    ;;
+      4) sudo_executar ;;
+      5) sudo_instalar ;;
       0) return ;;
       *) echo -e "${vermelho}[!] Opção inválida!${reset}"; sleep 1 ;;
     esac
@@ -282,7 +675,7 @@ menu_reconhecimento() {
 }
 
 # ====================================
-# ====== MÓDULO 3: SISTEMA/SETUP ======
+# ====== MÓDULO 4: SISTEMA/SETUP ======
 # ====================================
 
 # ------ ATUALIZAR SISTEMA ------
@@ -377,8 +770,9 @@ menu_principal() {
     echo -e "${ciano}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${reset}"
     echo ""
     echo -e "  ${verde}[1]${reset} 🌐 Tunelamento       ${amarelo}→ Ngrok / Cloudflare${reset}"
-    echo -e "  ${verde}[2]${reset} 🔍 Reconhecimento    ${amarelo}→ Nmap / Whois${reset}"
-    echo -e "  ${verde}[3]${reset} ⚙️  Sistema / Setup   ${amarelo}→ Update / Info${reset}"
+    echo -e "  ${verde}[2]${reset} 🔍 PS.Nmap            ${amarelo}→ Reconhecimento completo${reset}"
+    echo -e "  ${verde}[3]${reset} 🔑 PS.Sudo            ${amarelo}→ Acesso root no Termux${reset}"
+    echo -e "  ${verde}[4]${reset} ⚙️  Sistema / Setup   ${amarelo}→ Update / Info${reset}"
     echo ""
     echo -e "  ${vermelho}[0]${reset} 🚪 Sair"
     echo ""
@@ -389,7 +783,8 @@ menu_principal() {
     case $op in
       1) menu_tunelamento    ;;
       2) menu_reconhecimento ;;
-      3) menu_sistema        ;;
+      3) menu_sudo           ;;
+      4) menu_sistema        ;;
       0)
         echo ""
         echo -e "  ${ciano}Valeu rapaziada! Até a próxima! 👾${reset}"
