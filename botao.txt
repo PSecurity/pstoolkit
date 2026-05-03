@@ -1,4 +1,0 @@
-.code-box button {
-  background: #00ff9c;
-  box-shadow: 0 0 10px #00ff9c;
-}
