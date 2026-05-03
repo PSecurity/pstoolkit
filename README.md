@@ -145,8 +145,11 @@ O PS.Toolkit detecta automaticamente o ambiente e a arquitetura do dispositivo:
 **PeekSecurity** — Peek
 
 🎵 TikTok: [@PeekSecurity](https://www.tiktok.com/@peeksecurity)
+
 📺 YouTube: [@PeekSecurity](https://m.youtube.com/channel/UC-EKtzSnSUZ8b0CgyUY-hvw)
+
 🌐 Blog: [psecurity.github.io/PSecurity](https://psecurity.github.io/PSecurity)
+
 📝 WordPress: [peeksecurity.wordpress.com](https://peeksecurity.wordpress.com)
 
 ---
