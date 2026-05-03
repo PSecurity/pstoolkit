@@ -404,4 +404,3 @@ menu_principal() {
 
 # ====== INICIALIZAÇÃO ======
 menu_principal
-
